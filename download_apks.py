@@ -10,7 +10,6 @@ class APKDownloader:
         self.api_key = api_key
         self.concurrent_downloads = concurrent_downloads
         self.tool_directory = tool_directory
-        self.session = requests.Session()  # Now use a session for multiple requests
         self.create_lists()
         self.malware_len = 0
         self.benign_len = 0
@@ -26,6 +25,12 @@ class APKDownloader:
         if not os.path.exists(os.path.join(self.tool_directory, 'malware_apk_list.txt')):
             with open(os.path.join(self.tool_directory, 'malware_apk_list.txt'), 'w') as file:
                 pass
+
+        if not os.path.exists(os.path.join(self.tool_directory, 'benign')):
+            os.makedirs(os.path.join(self.tool_directory, 'benign'))
+
+        if not os.path.exists(os.path.join(self.tool_directory, 'malware')):
+            os.makedirs(os.path.join(self.tool_directory, 'malware'))
                 
         self.benign_sha256_list = self.read_sha256_from_file(os.path.join(self.tool_directory, 'benign.txt'))
         self.malware_sha256_list = self.read_sha256_from_file(os.path.join(self.tool_directory, 'viruses.txt'))
@@ -79,16 +84,13 @@ class APKDownloader:
                 print("Waiting for more disk space...")
                 time.sleep(300)
                 available_space_gb = self.check_disk_space()
-
-        if sha256 in list_path:
-            print(f"This file has already been downloaded for SHA256: {sha256}")
-
+        
+        
         progress = self.calculate_progress(list_path, file_type)
 
         if progress is not None and self.progress_callback:
             self.progress_callback(progress)
 
-       
         params = {
             "apikey": self.api_key,
             "sha256": sha256
@@ -97,15 +99,26 @@ class APKDownloader:
         try:
             response = requests.get(url, params=params, stream=True)
             response.raise_for_status()
-
+            
             with open(f"{download_path}{sha256}.apk", 'wb') as apk_file:
                 for chunk in response.iter_content(chunk_size=8192):
                     apk_file.write(chunk)
-
+            if file_type == 'benign':
+                if sha256 in self.read_sha256(os.path.join(self.tool_directory, 'benign_apk_list.txt')):
+                    print(f'This {sha256} has been already downloaded!')
+                    return
+                with open (os.path.join(self.tool_directory, 'benign_apk_list.txt'), 'a') as file:
+                    file.write(f'{sha256} \n') 
+            if file_type == 'malware':
+                if sha256 in self.read_sha256(os.path.join(self.tool_directory, 'malware_apk_list.txt')):
+                    print(f'This {sha256} has been already downloaded!')
+                    return
+                with open (os.path.join(self.tool_directory, 'malware_apk_list.txt'), 'a') as file:
+                    file.write(f'{sha256} \n') 
             print(f"Downloaded APK for SHA256: {sha256}")
-            with open(list_path, 'a') as list_file:
-                list_file.write(f"{sha256}\n")
-
+            
+            
+        
         except requests.exceptions.RequestException as e:
             print(f"Error downloading APK for SHA256 {sha256}: {e}")
     
@@ -122,6 +135,15 @@ class APKDownloader:
             sha256_list = [item.replace("'", "") for item in sha256_list]
 
         return sha256_list
+    
+    def read_sha256(self, file_path):
+        read_sha256_list = list()
+        with open(file_path, 'r') as file:
+            for line in file:
+                read_sha256_list.append(line.strip())  # Strip to remove any leading/trailing whitespaces
+        return read_sha256_list
+            
+        
 
     def run(self, malicious=False, benign=True):
         if benign:
