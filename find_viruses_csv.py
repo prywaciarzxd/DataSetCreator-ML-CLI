@@ -35,7 +35,7 @@ class VirusFinder:
                 if self.progress_callback:
                     self.progress_callback(progress_percentage)
 
-def parse_arguments_1():
+def parse_arguments_find_files():
     parser = argparse.ArgumentParser(description='Find viruses in a CSV file.')
     
     default_input_csv = os.path.join(os.getcwd(), 'latest.csv') #Adjust here
@@ -61,7 +61,7 @@ def parse_arguments_1():
     return parser.parse_args()
 
 if __name__ == "__main__":
-    args = parse_arguments_1()
+    args = parse_arguments_find_files()
     virus_finder = VirusFinder(args.input_csv, args.viruses_txt, args.benign_txt)
     virus_finder.find_viruses()
     
