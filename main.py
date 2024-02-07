@@ -11,8 +11,9 @@ from remove_decompiled_dirs import FolderManager
 from extract_features import ManifestProcessor
 #from dnn import HyperparameterGridSearch
 
-class PrepareApksGCLI:
+class PrepareApksCLI:
     def __init__(self):
+        self.concurrent_downloads = 1
         self.main_input()
 
     def main_input(self):
@@ -22,7 +23,9 @@ class PrepareApksGCLI:
             print('3.Decompile apk files.')
             print('4.Extract static features from apk files.')
             print('5.Remove decompiled dirs.')
-            print('6.Quit')
+            print('6.Set AdroZooDataset Api key to be able to download.')
+            print('7.Change number of concurrent downloads (default 1 max 20).')
+            print('8.Quit')
             try:
                 self.choice = int(input('Enter a number: '))
                 if self.choice == 1:
@@ -36,32 +39,36 @@ class PrepareApksGCLI:
                 elif self.choice == 5:
                     self.remove_dirs()
                 elif self.choice == 6:
+                    self.enter_api_key()
+                elif self.choice == 7:
+                    self.change_workers()
+                elif self.choice == 8:
                     return 0
             except ValueError:
                 print('You entered the wrong number, please try again!')
     
     def remove_dirs(self):
-        removing_dir = simpledialog.askstring("Directory to delete decompiled folders", "Enter benign or malware: ", parent=self.master)
+        removing_dir = input("Directory to delete decompiled folders. Enter benign or malware: ")
         if removing_dir:
             folder_manager = FolderManager(tool_directory=os.getcwd(), base_path=removing_dir)
             folder_manager.delete_unused_decompiled_folders()
-        self.show_notification(f'Decompiled dirs has been removed!')
+        print(f'Decompiled dirs has been removed!')
 
     def enter_api_key(self):
-        api_key = simpledialog.askstring("API KEY", "Enter correct api key:", parent=self.master)
-
+        api_key = input("Enter correct api key: ")
         os.environ["ZooDataSet"] = api_key
-
-        self.show_notification(f"Your env variable has been set: {os.environ['ZooDataSet']}")
+        print(f"Your env variable has been set: {os.environ['ZooDataSet']} \n \n")
+       
     
-   
-
     def change_workers(self):
-        self.concurrent_downloads =  int(simpledialog.askstring("Concurrent downloads", "Enter int number (max 20):", parent=self.master))
-        self.show_notification(f"Your concurrent downloads has been changed to {self.concurrent_downloads} !")
+        try:
+            self.concurrent_downloads =  int(input("Enter number of concurrent downloads: "))
+            print("Number of concurrent downloads has been changed!")
+        except ValueError:
+                print('You entered the wrong number, please try again!')
         
     def extract_features(self):
-        dir_to_extract_features_from = simpledialog.askstring("Directory for features extraction", "Enter 'malware' or 'benign':", parent=self.master)
+        dir_to_extract_features_from = input("Directory for features extraction. Enter 'malware' or 'benign':")
         manifest_processor = ManifestProcessor(
             tool_directory=os.getcwd(),
             manifests_directory="manifests",
@@ -70,20 +77,10 @@ class PrepareApksGCLI:
         )
 
         manifest_processor.process_manifests()
-        self.show_notification("Static features has been extracted!")
+        
 
-    def ask_download_type(self):
-        download_type = simpledialog.askstring("Download Type", "Enter 'malware' or 'benign':", parent=self.master)
-        if download_type:
-            self.download_files(download_type.lower())
-    
-    def ask_dir_decompile(self):
-        decompile_dir = simpledialog.askstring("Directory to decompile", "Enter benign or malware: ", parent=self.master)
-        if decompile_dir:
-            self.decompile_apks(decompile_dir.lower())
-    
 
-    def download_files(self, download_type):
+    def download_files(self):
 
         apk_downloader = APKDownloader(
             api_key=os.environ['ZooDataSet'],
@@ -92,12 +89,12 @@ class PrepareApksGCLI:
         )
 
         def update_progress(progress):
-            print(f"Progress: {progress:.2f}%")
-            if progress % 5 == 0:
-                self.progress_bar["value"] = progress
-                self.master.update_idletasks()
+            if progress % 1 == 0:
+                print(f"Progress: {progress:.2f}%")
         
         apk_downloader.set_progress_callback(update_progress)
+
+        download_type = input("Enter download type 'malware' or 'benign': ")
 
         if download_type == 'malware':
             apk_downloader.run(malicious=True, benign=False)
@@ -107,25 +104,17 @@ class PrepareApksGCLI:
             print("Invalid download_type. Please enter 'malware' or 'benign'.")
             return
 
-        self.progress_bar.stop()
-        self.progress_bar.destroy()
-
     def find_files(self):
-        
         args = parse_arguments_find_files()
-        print(args)
         virus_finder = VirusFinder(args.input_csv, args.viruses_txt, args.benign_txt)
-
         def update_progress(progress):
-            print(f"Progress: {progress:.2f}%")
-            
+            if progress % 1 == 0:
+                print(f"Progress: {progress:.2f}%")
         virus_finder.set_progress_callback(update_progress)
         virus_finder.find_viruses()
 
-        
-
-   
-    def decompile_apks(self, decompile_dir):
+    def decompile_apks(self):
+        decompile_dir = input("Enter which types of files u want to decompile benign or malware: ")
         apk_processor = ApkProcessor(
         tool_directory=os.getcwd(),
         manifests_dir="manifests",
@@ -137,5 +126,5 @@ class PrepareApksGCLI:
 
         
 if __name__ == "__main__":
-     apk = PrepareApksGCLI()
+     apk = PrepareApksCLI()
      
