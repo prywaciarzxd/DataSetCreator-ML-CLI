@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-import tkinter as tk
-from tkinter import simpledialog, ttk
 import argparse
 import os
 import subprocess
@@ -8,58 +5,40 @@ import sys
 import time
 
 from download_apks import APKDownloader
-from find_viruses_csv import VirusFinder, parse_arguments_1
+from find_viruses_csv import VirusFinder, parse_arguments_find_files
 from decompile import *
 from remove_decompiled_dirs import FolderManager
 from extract_features import ManifestProcessor
-from dnn import HyperparameterGridSearch
+#from dnn import HyperparameterGridSearch
 
-class PrepareApksGUI:
+class PrepareApksGCLI:
+    def __init__(self):
+        self.main_input()
 
-    def __init__(self, master):
-        self.master = master
-        master.title("DataSet Creator")
-        
-        window_width = 500
-        window_height = 500
-        screen_width = master.winfo_screenwidth()
-        screen_height = master.winfo_screenheight()
-        x = (screen_width - window_width) // 2
-        y = (screen_height - window_height) // 2
-        master.geometry(f"{window_width}x{window_height}+{x}+{y}")
-
-        self.button_get_api_key = tk.Button(master, text="Enter your api key", command=self.enter_api_key)
-        self.button_get_api_key.pack(pady=10)
-
-        self.button_find_files = tk.Button(master, text="Find specific files from CSV", command=self.find_files)
-        self.button_find_files.pack(pady=10)
-
-        self.button_download = tk.Button(master, text="Download files", command=self.ask_download_type)
-        self.button_download.pack(pady=10)
-
-        self.button_downloads_number = tk.Button(master, text="Change number of downloads", command=self.change_workers)
-        self.button_downloads_number.pack(pady=10)
-
-        self.button_decompile = tk.Button(master, text="Decompile APK files", command=self.ask_dir_decompile)
-        self.button_decompile.pack(pady=10)
-
-        self.button_remove_dirs = tk.Button(master, text="Remove decompiled dirs", command=self.remove_dirs)
-        self.button_remove_dirs.pack(pady=10)
-
-        self.button_extract = tk.Button(master, text="Extract static features", command=self.extract_features)
-        self.button_extract.pack(pady=10)
-
-        self.button_dnn_model = tk.Button(master, text="Build DNN model", command=self.dnn)
-        self.button_dnn_model.pack(pady=10)
-
-        self.button_quit = tk.Button(master, text="Quit", command=master.quit)
-        self.button_quit.pack(pady=10)
-
-        self.progress_bar = ttk.Progressbar(master, orient="horizontal", length=200, mode="determinate")
-        self.progress_bar.pack(pady=10)
-
-        self.concurrent_downloads = 1
-        self.current_directory = os.getcwd()
+    def main_input(self):
+        while True:
+            print('1.Find viruses or benign apks from latest.csv file.')
+            print('2.Download apk files.')
+            print('3.Decompile apk files.')
+            print('4.Extract static features from apk files.')
+            print('5.Remove decompiled dirs.')
+            print('6.Quit')
+            try:
+                self.choice = int(input('Enter a number: '))
+                if self.choice == 1:
+                    self.find_files()
+                elif self.choice == 2:
+                    self.download_files()
+                elif self.choice == 3:
+                    self.decompile_apks()
+                elif self.choice == 4:
+                    self.extract_features()
+                elif self.choice == 5:
+                    self.remove_dirs()
+                elif self.choice == 6:
+                    return 0
+            except ValueError:
+                print('You entered the wrong number, please try again!')
     
     def remove_dirs(self):
         removing_dir = simpledialog.askstring("Directory to delete decompiled folders", "Enter benign or malware: ", parent=self.master)
@@ -75,23 +54,7 @@ class PrepareApksGUI:
 
         self.show_notification(f"Your env variable has been set: {os.environ['ZooDataSet']}")
     
-    def dnn(self):
-        dataset_path = simpledialog.askstring("DataSetPath", "Enter dataset absolute path", parent=self.master)
-        dnn_model = HyperparameterGridSearch(
-            data_path=dataset_path,
-            home_directory=os.path.expanduser("~"), 
-            tool_directory="DatasetCreator-ML",
-            results_file_path="dnn_results"
-        )
-        dnn_model.load_data()
-        dnn_model.preprocess_data()
-
-        optimizers = ['adam', 'sgd', 'rmsprop', 'adamax']
-        batch_sizes = [16, 32, 64]
-        epochs_values = [5, 10, 15]
-        neuron_values = [32, 64, 128]
-
-        dnn_model.search_hyperparameters(optimizers, batch_sizes, epochs_values, neuron_values)
+   
 
     def change_workers(self):
         self.concurrent_downloads =  int(simpledialog.askstring("Concurrent downloads", "Enter int number (max 20):", parent=self.master))
@@ -148,44 +111,20 @@ class PrepareApksGUI:
         self.progress_bar.destroy()
 
     def find_files(self):
-        args = parse_arguments_1()
+        
+        args = parse_arguments_find_files()
+        print(args)
         virus_finder = VirusFinder(args.input_csv, args.viruses_txt, args.benign_txt)
 
         def update_progress(progress):
             print(f"Progress: {progress:.2f}%")
-            if progress % 1 == 0:
-                self.progress_bar["value"] = progress
-                self.master.update_idletasks()
-
+            
         virus_finder.set_progress_callback(update_progress)
         virus_finder.find_viruses()
 
-        self.progress_bar.stop()
-        self.progress_bar.destroy()
+        
 
-        self.show_notification(f'Viruses saved to: {args.output_viruses}\nBenign apps saved to: {args.output_benign_txt}')
-
-    def show_notification(self, message):
-        notification_window = tk.Toplevel(self.master)
-        notification_window.title("Notification")
-
-        notification_label = tk.Label(notification_window, text=message)
-        notification_label.pack()
-
-        window_width = notification_window.winfo_reqwidth()
-        window_height = notification_window.winfo_reqheight()
-        screen_width = notification_window.winfo_screenwidth()
-        screen_height = notification_window.winfo_screenheight()
-        x = (screen_width - window_width) // 2
-        y = (screen_height - window_height) // 2
-
-        notification_window.geometry(f"+{x}+{y}")
-
-        # Dodaj zamknięcie okna komunikatu po kliknięciu przycisku "OK"
-        ok_button = tk.Button(notification_window, text="OK", command=notification_window.destroy)
-        ok_button.pack(pady=10)
-
-
+   
     def decompile_apks(self, decompile_dir):
         apk_processor = ApkProcessor(
         tool_directory=os.getcwd(),
@@ -198,6 +137,5 @@ class PrepareApksGUI:
 
         
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = PrepareApksGUI(root)
-    root.mainloop()
+     apk = PrepareApksGCLI()
+     
